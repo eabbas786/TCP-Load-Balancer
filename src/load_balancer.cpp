@@ -14,7 +14,6 @@ int main(int argc, char *argv[])
     int listen_fd = socket(AF_INET, SOCK_STREAM, 0); // create TCP socket
     sockaddr_in server_addr;
     int opt = 1;
-    // const int PORT = 8080;
     int port = atoi(argv[1]);
 
     if (listen_fd < 0)
@@ -49,28 +48,30 @@ int main(int argc, char *argv[])
         sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
 
-        int client_socket = accept(listen_fd, (sockaddr *)&client_addr, &client_len);
+        int client_fd = accept(listen_fd, (sockaddr *)&client_addr, &client_len);
 
-        if (client_socket < 0)
+        if (client_fd < 0)
         {
             std::cerr << "Accept failed.\n";
             continue;
         }
 
-        // handle_client(client_socket);
+        handle_client(client_fd);
 
-        char buffer[1024] = {0};
+        // char buffer[1024] = {0};
 
-        // read message from client and write into buffer using recv
-        int bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+        // // read message from client and write into buffer using recv
+        // int bytes = recv(client_socket, buffer, sizeof(buffer), 0);
 
-        std::cout << "Recieved: " << buffer << "\n";
+        // std::cout << "Recieved: " << buffer << "\n";
 
-        const std::string response = "Hello from server " + std::to_string(port) + "\n";
+        // const std::string response = "Hello from server " + std::to_string(port) + "\n";
 
-        // send server response to client
-        send(client_socket, response.c_str(), response.length(), 0);
+        // // send server response to client
+        // send(client_socket, response.c_str(), response.length(), 0);
 
-        close(client_socket); // close connection with client
+        close(client_fd); // close client socket
     }
+
+    close(listen_fd);
 }
