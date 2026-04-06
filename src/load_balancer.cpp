@@ -13,7 +13,6 @@ int main(int argc, char *argv[])
 
     int listen_fd = socket(AF_INET, SOCK_STREAM, 0); // create TCP socket
     sockaddr_in server_addr;
-    int opt = 1;
     int port = atoi(argv[1]);
 
     if (listen_fd < 0)
@@ -23,6 +22,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    // fill address details
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(port);
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    std::cout << "Server listening on port " << port << ".\n";
+    std::cout << "Proxy listening on port " << port << ".\n";
 
     // infinite loop to continue accepting clients
     while (true)
@@ -73,5 +73,5 @@ int main(int argc, char *argv[])
         close(client_fd); // close client socket
     }
 
-    close(listen_fd);
+    close(listen_fd); // close program's listener
 }

@@ -8,7 +8,7 @@ void handle_client(int client_fd)
     int upstream_fd = socket(AF_INET, SOCK_STREAM, 0);
 
     // get address for backend server's listener
-    sockaddr_in backend_addr{};
+    sockaddr_in backend_addr;
     backend_addr.sin_family = AF_INET;
     backend_addr.sin_port = htons(9001);                     // port for backend server
     inet_pton(AF_INET, "127.0.0.1", &backend_addr.sin_addr); // converts TCP address into its numeric binary form
