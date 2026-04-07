@@ -1,19 +1,32 @@
 
 // import libraries
 #include <iostream>
-#include <stdlib.h>
+#include <vector>
+#include <string>
 #include <cstring>
-#include <unistd.h>    // to allow for low-level calls
+#include <stdlib.h>
 #include <arpa/inet.h> // networking operations
+#include <unistd.h>    // to allow for low-level calls
 
 #include "proxy.h"
+
+// define stuct to allow multiple backends
 
 int main(int argc, char *argv[])
 {
 
     int listen_fd = socket(AF_INET, SOCK_STREAM, 0); // create TCP socket
-    sockaddr_in server_addr;
+    sockaddr_in server_addr{};
     int port = atoi(argv[1]);
+
+    // define multiple backends and store them in a vector
+    std::vector<Backend> backends = {
+        {"127.0.0.1", 9001},
+        {"127.0.0.1", 9002},
+        {"127.0.0.1", 9003}};
+
+    // std::vector<Backend> backends = {
+    //     {"127.0.0.1", 9001}};
 
     if (listen_fd < 0)
     {
@@ -43,6 +56,7 @@ int main(int argc, char *argv[])
     std::cout << "Proxy listening on port " << port << ".\n";
 
     // infinite loop to continue accepting clients
+    int next_backend = 0;
     while (true)
     {
         sockaddr_in client_addr;
@@ -56,7 +70,9 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        handle_client(client_fd);
+        Backend backend = backends[next_backend % backends.size()];
+
+        handle_client(client_fd, backend);
 
         // char buffer[1024] = {0};
 
@@ -71,6 +87,8 @@ int main(int argc, char *argv[])
         // send(client_socket, response.c_str(), response.length(), 0);
 
         close(client_fd); // close client socket
+
+        next_backend++; // next backend
     }
 
     close(listen_fd); // close program's listener
