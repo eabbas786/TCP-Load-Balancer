@@ -1,2 +1,2 @@
-#TCP Load Balancer
+# TCP Load Balancer
 Building a networking load balancer in C++. Currently the program acts as TCP proxy with round-robin load balancing and bidirectional socket forwarding using POSIX sockets and functions (socket, bind, listen, connect, accept, send, recv, and close). I am now working on adding multithreaded connection handling.
