@@ -1,3 +1,5 @@
+#include "proxy.h"
+#include "thread_pool.h"
 
 // import libraries
 #include <iostream>
@@ -7,8 +9,6 @@
 #include <stdlib.h>
 #include <arpa/inet.h> // networking operations
 #include <unistd.h>    // to allow for low-level calls
-
-#include "proxy.h"
 
 // define stuct to allow multiple backends
 
@@ -25,8 +25,9 @@ int main(int argc, char *argv[])
         {"127.0.0.1", 9002},
         {"127.0.0.1", 9003}};
 
-    // std::vector<Backend> backends = {
-    //     {"127.0.0.1", 9001}};
+    // create thread pool
+    start_thread_pool(4);
+    sleep(1);
 
     if (listen_fd < 0)
     {
@@ -47,6 +48,8 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    // make socket_fd passive so it can listen for and
+    // accept connections
     if (listen(listen_fd, 5) < 0)
     {
         std::cerr << "Listening error/ Connection refused\n";
@@ -55,14 +58,21 @@ int main(int argc, char *argv[])
 
     std::cout << "Proxy listening on port " << port << ".\n";
 
-    // infinite loop to continue accepting clients
+    // Round Robin Counter
     int next_backend = 0;
+
+    // infinite loop to continue accepting clients
     while (true)
     {
+        // address of client
         sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
 
+        // accept connection request from client and create client socket for the client
+        // client address gets saved in client_addr
         int client_fd = accept(listen_fd, (sockaddr *)&client_addr, &client_len);
+
+        std::cout << "In main, client_fd= " << client_fd << "\n";
 
         if (client_fd < 0)
         {
@@ -70,9 +80,12 @@ int main(int argc, char *argv[])
             continue;
         }
 
+        // get next backend
         Backend backend = backends[next_backend % backends.size()];
 
-        handle_client(client_fd, backend);
+        // queue the connection
+        std::cout << "Calling enqueue_connection\n";
+        enqueue_connection(client_fd, backend);
 
         // char buffer[1024] = {0};
 
@@ -85,8 +98,7 @@ int main(int argc, char *argv[])
 
         // // send server response to client
         // send(client_socket, response.c_str(), response.length(), 0);
-
-        close(client_fd); // close client socket
+        // close(client_fd)
 
         next_backend++; // next backend
     }
