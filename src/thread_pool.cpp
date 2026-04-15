@@ -52,8 +52,15 @@ void worker()
                   << task.client_fd
                   << std::endl;
 
-        handle_client(task.client_fd, task.backend);
-        close(task.client_fd); // close client socket
+        Backend *backend = task.backend;
+        backend->num_connections++; // Important: increment atomic counter
+        std::cout << "Port " << backend->port << " has " << backend->num_connections
+                  << " connections after being incremented\n";
+        handle_client(task.client_fd, backend); // forward client to backend
+        close(task.client_fd);                  // close client socket
+        backend->num_connections--;             // connection closed; decrement atomic counter
+        std::cout << "Port " << backend->port << " has " << backend->num_connections
+                  << " connections after being decremented\n";
     }
 }
 
@@ -74,7 +81,7 @@ void start_thread_pool(int num_threads = std::thread::hardware_concurrency())
 }
 
 // this function queues connections
-void enqueue_connection(int client_fd, Backend backend)
+void enqueue_connection(int client_fd, Backend &backend)
 {
     std::cout << "In enqueue_connection\n";
     {
@@ -85,7 +92,8 @@ void enqueue_connection(int client_fd, Backend backend)
         std::cout << "Recieved " << client_fd << " client_fd\n";
 
         // push client socket that wants to connect and backend to forward to
-        Task task = {client_fd, backend};
+        Backend *backend_ptr = &backend;
+        Task task = {client_fd, backend_ptr};
         taskQueue.push(task);
     }
 

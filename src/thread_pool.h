@@ -2,11 +2,13 @@
 
 #include "proxy.h"
 
+#include "atomic"
+
 struct Task
 {
     int client_fd;
-    Backend backend;
+    Backend *backend;
 };
 
 void start_thread_pool(int num_threads);
-void enqueue_connection(int client_fd, Backend backend);
+void enqueue_connection(int client_fd, Backend &backend);

@@ -4,6 +4,7 @@
 // import libraries
 #include <iostream>
 #include <vector>
+#include <memory>
 #include <string>
 #include <cstring>
 #include <stdlib.h>
@@ -20,10 +21,13 @@ int main(int argc, char *argv[])
     int port = atoi(argv[1]);
 
     // define multiple backends and store them in a vector
-    std::vector<Backend> backends = {
-        {"127.0.0.1", 9001},
-        {"127.0.0.1", 9002},
-        {"127.0.0.1", 9003}};
+    // need to use unique_ptr to prevent copying during
+    // vector reallocation. Backend contains a member
+    // of atomic type so cannot be copied
+    std::vector<std::unique_ptr<Backend>> backends;
+    backends.push_back(std::make_unique<Backend>("127", 9001));
+    backends.push_back(std::make_unique<Backend>("127", 9002));
+    backends.push_back(std::make_unique<Backend>("127", 9003));
 
     // create thread pool
     start_thread_pool(4);
@@ -48,7 +52,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    // make socket_fd passive so it can listen for and
+    // make listen_fd passive so it can listen for and
     // accept connections
     if (listen(listen_fd, 5) < 0)
     {
@@ -59,7 +63,7 @@ int main(int argc, char *argv[])
     std::cout << "Proxy listening on port " << port << ".\n";
 
     // Round Robin Counter
-    int next_backend = 0;
+    // int next_backend = 0;
 
     // infinite loop to continue accepting clients
     while (true)
@@ -81,26 +85,30 @@ int main(int argc, char *argv[])
         }
 
         // get next backend
-        Backend backend = backends[next_backend % backends.size()];
+
+        // This is by round robin
+        // Backend backend = backends[next_backend % backends.size()];
+
+        // This gets the next backend using least connections
+        int index = 0;
+        int min_connections = backends[0]->num_connections.load();
+        for (int i = 1; i < backends.size(); i++)
+        {
+            int connections = backends[i]->num_connections.load();
+            if (connections < min_connections)
+            {
+                min_connections = connections;
+                int index = i;
+            }
+        }
 
         // queue the connection
         std::cout << "Calling enqueue_connection\n";
-        enqueue_connection(client_fd, backend);
+        enqueue_connection(client_fd, *backends[index]);
 
         // char buffer[1024] = {0};
 
-        // // read message from client and write into buffer using recv
-        // int bytes = recv(client_socket, buffer, sizeof(buffer), 0);
-
-        // std::cout << "Recieved: " << buffer << "\n";
-
-        // const std::string response = "Hello from server " + std::to_string(port) + "\n";
-
-        // // send server response to client
-        // send(client_socket, response.c_str(), response.length(), 0);
-        // close(client_fd)
-
-        next_backend++; // next backend
+        // next_backend++; // next backend
     }
 
     close(listen_fd); // close program's listener

@@ -6,7 +6,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-void handle_client(int client_fd, Backend backend)
+void handle_client(int client_fd, Backend *backend)
 {
     // set client_fd to non_blocking so thread does not get stuck
     int flags = fcntl(client_fd, F_GETFL, 0); // Get current flags
@@ -29,14 +29,14 @@ void handle_client(int client_fd, Backend backend)
     // get address for backend server's listener
     sockaddr_in backend_addr{};
     backend_addr.sin_family = AF_INET;
-    backend_addr.sin_port = htons(backend.port);                       // port for backend server
-    inet_pton(AF_INET, (char *)&backend.host, &backend_addr.sin_addr); // converts TCP address into its numeric binary form
+    backend_addr.sin_port = htons(backend->port);                       // port for backend server
+    inet_pton(AF_INET, (char *)&backend->host, &backend_addr.sin_addr); // converts TCP address into its numeric binary form
 
     // connect backend socket to backend's listener,
     // where backend_addr is associated with the backend server's listener
     std::cout << "Connecting to "
-              << backend.host << ":"
-              << backend.port << std::endl;
+              << backend->host << ":"
+              << backend->port << std::endl;
     if (connect(upstream_fd, (sockaddr *)&backend_addr, sizeof(backend_addr)) < 0)
     {
         std::cerr << "connect failed: Connection refused";
@@ -62,9 +62,9 @@ void handle_client(int client_fd, Backend backend)
         // send the collected data from proxy to backend server
         std::cout
             << "6) Forwarding to backend: "
-            << backend.host
+            << backend->host
             << ":"
-            << backend.port
+            << backend->port
             << std::endl;
 
         send(upstream_fd, buffer, bytes, 0);
