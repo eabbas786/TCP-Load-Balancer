@@ -33,6 +33,7 @@ void worker()
 
             // wait until there is a task to be executed i.e. there is at least one client
             // releases mutex while sleeping
+
             // re-locks mutex when wakes up (once condition is satisfied)
             std::cout << "Checking condition\n";
             std::cout << "ADDR taskQueue before wait: " << &taskQueue << std::endl;
@@ -57,8 +58,9 @@ void worker()
         std::cout << "Port " << backend->port << " has " << backend->num_connections
                   << " connections after being incremented\n";
         handle_client(task.client_fd, backend); // forward client to backend
-        close(task.client_fd);                  // close client socket
-        backend->num_connections--;             // connection closed; decrement atomic counter
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        close(task.client_fd);      // close client socket
+        backend->num_connections--; // connection closed; decrement atomic counter
         std::cout << "Port " << backend->port << " has " << backend->num_connections
                   << " connections after being decremented\n";
     }

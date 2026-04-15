@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
             if (connections < min_connections)
             {
                 min_connections = connections;
-                int index = i;
+                index = i;
             }
         }
 
