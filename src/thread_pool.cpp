@@ -54,11 +54,12 @@ void worker()
                   << std::endl;
 
         Backend *backend = task.backend;
-        backend->num_connections++; // Important: increment atomic counter
+        std::cout << "WORKER: " << task.backend << std::endl;
+        // backend->num_connections++; // Important: increment atomic counter
         std::cout << "Port " << backend->port << " has " << backend->num_connections
-                  << " connections after being incremented\n";
+                  << " connections before handle client\n";
         handle_client(task.client_fd, backend); // forward client to backend
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
         close(task.client_fd);      // close client socket
         backend->num_connections--; // connection closed; decrement atomic counter
         std::cout << "Port " << backend->port << " has " << backend->num_connections
@@ -68,7 +69,7 @@ void worker()
 
 // function for creating thread_pool
 // called by load_balancer.cpp
-void start_thread_pool(int num_threads = std::thread::hardware_concurrency())
+void start_thread_pool(int num_threads)
 {
     for (int i = 0; i < num_threads; i++)
     {

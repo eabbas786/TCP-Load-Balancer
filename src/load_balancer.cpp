@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     backends.push_back(std::make_unique<Backend>("127", 9003));
 
     // create thread pool
-    start_thread_pool(4);
+    start_thread_pool();
     sleep(1);
 
     if (listen_fd < 0)
@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 
     // make listen_fd passive so it can listen for and
     // accept connections
-    if (listen(listen_fd, 5) < 0)
+    if (listen(listen_fd, SOMAXCONN) < 0)
     {
         std::cerr << "Listening error/ Connection refused\n";
         return EXIT_FAILURE;
@@ -98,12 +98,21 @@ int main(int argc, char *argv[])
             if (connections < min_connections)
             {
                 min_connections = connections;
+
                 index = i;
             }
         }
 
+        // after you pick index
+        std::cout << "b0=" << backends[0]->num_connections.load()
+                  << " b1=" << backends[1]->num_connections.load()
+                  << " b2=" << backends[2]->num_connections.load()
+                  << std::endl;
+
         // queue the connection
         std::cout << "Calling enqueue_connection\n";
+        std::cout << "SELECT: " << backends[index].get() << std::endl;
+        backends[index]->num_connections++; // Important: increment atomic counter
         enqueue_connection(client_fd, *backends[index]);
 
         // char buffer[1024] = {0};

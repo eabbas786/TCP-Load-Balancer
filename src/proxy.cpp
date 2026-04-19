@@ -2,17 +2,12 @@
 #include "proxy.h"
 
 #include <iostream>
-#include <fcntl.h> // to stop blocking
+#include <cstdio> //perror
 #include <arpa/inet.h>
 #include <unistd.h>
 
 void handle_client(int client_fd, Backend *backend)
 {
-    // set client_fd to non_blocking so thread does not get stuck
-    int flags = fcntl(client_fd, F_GETFL, 0); // Get current flags
-    if (flags == -1)
-        return;
-    fcntl(client_fd, F_SETFL, flags | O_NONBLOCK); // Add non-blocking flag
 
     std::cout << "1) IN handle_client\n";
 
@@ -39,7 +34,8 @@ void handle_client(int client_fd, Backend *backend)
               << backend->port << std::endl;
     if (connect(upstream_fd, (sockaddr *)&backend_addr, sizeof(backend_addr)) < 0)
     {
-        std::cerr << "connect failed: Connection refused";
+
+        std::perror("connect failed: Connection refused");
         close(upstream_fd);
         return;
     }
@@ -53,9 +49,9 @@ void handle_client(int client_fd, Backend *backend)
 
         // read bytes sent by client to proxy into buffer
         std::cout << "4) About to recieve from client " << client_fd << "\n";
-        int bytes = recv(client_fd, buffer, sizeof(buffer), MSG_DONTWAIT);
-        // if (bytes <= 0)
-        //     break;
+        int bytes = recv(client_fd, buffer, sizeof(buffer), 0);
+        if (bytes <= 0)
+            break;
 
         std::cout << "5) Recieve from client return " << bytes << "bytes \n";
 
@@ -67,7 +63,14 @@ void handle_client(int client_fd, Backend *backend)
             << backend->port
             << std::endl;
 
-        send(upstream_fd, buffer, bytes, 0);
+        int sent = 0;
+        while (sent < bytes)
+        {
+            int n = send(upstream_fd, buffer + sent, bytes - sent, 0);
+            if (n <= 0)
+                break;
+            sent += n;
+        }
 
         // read data sent from backend server to proxy
         std::cout << "7) About to recieve from Backend\n";
@@ -79,7 +82,14 @@ void handle_client(int client_fd, Backend *backend)
 
         // send data sent by server to client
         std::cout << "9) Sending to client\n";
-        send(client_fd, buffer, bytes, 0);
+        sent = 0;
+        while (sent < bytes)
+        {
+            int n = send(client_fd, buffer + sent, bytes - sent, 0);
+            if (n <= 0)
+                break;
+            sent += n;
+        }
 
         std::cout << "10) Done\n";
     }
