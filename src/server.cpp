@@ -59,12 +59,15 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        char buffer[1024] = {0};
+        char buffer[4096];
 
         // read message from client and write into buffer using recv
         int bytes = recv(client_fd, buffer, sizeof(buffer), 0);
+        if (bytes <= 0)
+            break;
 
-        std::cout << "Recieved: " << buffer << "\n";
+        std::cout << "Recieved: \n";
+        std::cout.write(buffer, bytes);
 
         const std::string response = "Hello from server " + std::to_string(port) + "\n";
 
