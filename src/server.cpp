@@ -61,18 +61,22 @@ int main(int argc, char *argv[])
 
         char buffer[4096];
 
-        // read message from client and write into buffer using recv
-        int bytes = recv(client_fd, buffer, sizeof(buffer), 0);
-        if (bytes <= 0)
-            break;
+        while (true)
+        {
+            // read message from client and write into buffer using recv
+            int bytes = recv(client_fd, buffer, sizeof(buffer), 0);
+            if (bytes <= 0)
+                break;
 
-        std::cout << "Recieved: \n";
-        std::cout.write(buffer, bytes);
+            std::cout << "Recieved: \n";
+            std::cout.write(buffer, bytes);
 
-        const std::string response = "Hello from server " + std::to_string(port) + "\n";
+            const std::string response = "Hello from server " + std::to_string(port) + "\n";
 
-        // send server response to client
-        send(client_fd, response.c_str(), response.length(), 0);
+            // send server response to client
+            send(client_fd, response.c_str(), response.length(), 0);
+        }
+
         close(client_fd);
     }
 
