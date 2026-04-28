@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <iostream>
 #include <cstdio> //perror
+#include <algorithm>
 
 std::atomic_bool running = true; // for handling connection if one side closes
 
@@ -131,25 +132,6 @@ void handle_data(int src, int dest)
             end_connection(src, dest);
             break;
         }
-        if (status == 0)
-            continue;
-
-        uint32_t msg_siz = ntohl(len); // len is in network byte order and msg_size host byte
-
-        // get entire message; break if error
-        status = recv_all(src, buffer, msg_siz);
-        if (status < 0)
-        {
-            end_connection(src, dest);
-            break;
-        }
-        if (status == 0)
-            continue;
-
-        std::cout << "Recieved: " << msg_siz << " bytes\n\n";
-        std::cout.write(buffer, msg_siz);
-        std::cout << "\n\n";
-
         // send message length to dest; break if fail
         status = send_all(dest, (char *)&len, sizeof(len));
         if (status < 0)
@@ -157,78 +139,34 @@ void handle_data(int src, int dest)
             end_connection(src, dest);
             break;
         }
-        if (status == 0)
-            continue;
 
-        // send message to dest
-        status = send_all(dest, buffer, msg_siz);
-        if (status < 0)
+        uint32_t msg_siz = ntohl(len); // len is in network byte order and msg_size host byte
+
+        size_t total = msg_siz;
+        while (total > 0)
         {
-            end_connection(src, dest);
-            break;
+            size_t chunk = std::min(total, sizeof(buffer));
+            status = recv_all(src, buffer, chunk);
+            if (status < 0)
+            {
+                end_connection(src, dest);
+                break;
+            }
+
+            std::cout << "Recieved:\n\n";
+            std::cout.write(buffer, chunk);
+            std::cout << "\n\n";
+
+            // send message to dest
+            status = send_all(dest, buffer, chunk);
+            if (status < 0)
+            {
+                end_connection(src, dest);
+                break;
+            }
+
+            total -= chunk;
         }
-        if (status == 0)
-            continue;
-
-        // int bytes = 0;
-        // while (bytes < sizeof(len))
-        // {
-        //     int n = recv(src, (char *)&len + bytes, sizeof(len) - bytes, 0);
-        //     if (n <= 0)
-        //         break;
-        //     bytes += n;
-        // }
-
-        // // failed to read size correctly break out of loop
-        // if (bytes < sizeof(len))
-        //     break;
-
-        // // get meesage sent from client
-        // bytes = 0;
-        // while (bytes < msg_siz)
-        // {
-        //     int n = recv(src, buffer + bytes, msg_siz - bytes, 0);
-        //     if (n <= 0)
-        //         break;
-
-        //     bytes += n;
-        // }
-
-        // // failed to read full message break out of loop
-        // if (bytes < msg_siz)
-        //     break;
-
-        // std::cout << "Recieved: " << bytes << " bytes\n\n";
-        // std::cout.write(buffer, bytes);
-        // std::cout << "\n\n";
-
-        // // send size of message to server in network byte order (len)
-        // bytes = 0;
-        // while (bytes < sizeof(len))
-        // {
-        //     int n = send(dest, (char *)&len + bytes, sizeof(len) - bytes, MSG_NOSIGNAL);
-        //     if (n <= 0)
-        //         break;
-        //     bytes += n;
-        // }
-
-        // // failed to send message size
-        // if (bytes < sizeof(len))
-        //     break;
-
-        // // send message to server; use msg_siz since in host byte order
-        // int total = 0;
-        // while (total < msg_siz)
-        // {
-        //     int n = send(dest, buffer + total, msg_siz - total, MSG_NOSIGNAL);
-        //     if (n <= 0)
-        //         break;
-        //     total += n;
-        // }
-
-        // // failed to send entire message
-        // if (total < msg_siz)
-        //     break;
     }
 }
 void handle_client(int client_fd, Backend *backend)
@@ -274,64 +212,65 @@ void handle_client(int client_fd, Backend *backend)
     thread2.join(); // handle data sent from server to client
 
     close(upstream_fd); // close socket
-
-    // char buffer[4096]; // buffer to read and store sent data
-
-    // while (true)
-    // {
-
-    // read bytes sent by client to proxy into buffer
-    // std::cout << "4) About to recieve from client " << client_fd << "\n";
-
-    // std::cout << "4) C"
-
-    // std::cout << "5) Recieve from client return " << bytes << " bytes \n";
-    // std::cout << "Recieved: ";
-    // std::cout.write(buffer, bytes);
-    // std::cout << "\nfrom Client\n ";
-
-    // send the collected data from proxy to backend server
-    // std::cout
-    //     << "6) Forwarding to backend: "
-    //     << backend->host
-    //     << ":"
-    //     << backend->port
-    //     << std::endl;
-
-    // int sent = 0;
-    // while (sent < bytes)
-    // {
-    //     int n = send(upstream_fd, buffer + sent, bytes - sent, 0);
-    //     if (n <= 0)
-    //         break;
-    //     sent += n;
-    // }
-
-    // // read data sent from backend server to proxy
-    // std::cout << "7) About to recieve from Backend\n";
-    // bytes = recv(upstream_fd, buffer, sizeof(buffer), 0);
-    // if (bytes <= 0)
-    //     break;
-
-    // std::cout << "8) Recieved: " << bytes << " bytes\n";
-    // std::cout.write(buffer, bytes);
-    // std::cout << "\nfrom Backend\n ";
-    // // send data sent by server to client
-
-    // std::cout
-    //     << "9) Sending to client\n";
-    // sent = 0;
-    // while (sent < bytes)
-    // {
-    //     int n = send(client_fd, buffer + sent, bytes - sent, 0);
-    //     if (n <= 0)
-    //         break;
-    //     sent += n;
-    // }
-
-    //     std::cout << "10) Done\n";
-    // }
-
-    // close sockets
-    // close(upstream_fd);
 }
+
+// char buffer[4096]; // buffer to read and store sent data
+
+// while (true)
+// {
+
+// read bytes sent by client to proxy into buffer
+// std::cout << "4) About to recieve from client " << client_fd << "\n";
+
+// std::cout << "4) C"
+
+// std::cout << "5) Recieve from client return " << bytes << " bytes \n";
+// std::cout << "Recieved: ";
+// std::cout.write(buffer, bytes);
+// std::cout << "\nfrom Client\n ";
+
+// send the collected data from proxy to backend server
+// std::cout
+//     << "6) Forwarding to backend: "
+//     << backend->host
+//     << ":"
+//     << backend->port
+//     << std::endl;
+
+// int sent = 0;
+// while (sent < bytes)
+// {
+//     int n = send(upstream_fd, buffer + sent, bytes - sent, 0);
+//     if (n <= 0)
+//         break;
+//     sent += n;
+// }
+
+// // read data sent from backend server to proxy
+// std::cout << "7) About to recieve from Backend\n";
+// bytes = recv(upstream_fd, buffer, sizeof(buffer), 0);
+// if (bytes <= 0)
+//     break;
+
+// std::cout << "8) Recieved: " << bytes << " bytes\n";
+// std::cout.write(buffer, bytes);
+// std::cout << "\nfrom Backend\n ";
+// // send data sent by server to client
+
+// std::cout
+//     << "9) Sending to client\n";
+// sent = 0;
+// while (sent < bytes)
+// {
+//     int n = send(client_fd, buffer + sent, bytes - sent, 0);
+//     if (n <= 0)
+//         break;
+//     sent += n;
+// }
+
+//     std::cout << "10) Done\n";
+// }
+
+// close sockets
+// close(upstream_fd);
+//}

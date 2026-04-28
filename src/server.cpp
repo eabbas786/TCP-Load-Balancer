@@ -6,6 +6,41 @@
 #include <arpa/inet.h> // networking operations
 #include <unistd.h>    // to allow for low-level calls
 
+#include <algorithm> // for min
+
+bool is_recv_all(int fd, char *buf, int len)
+{
+    // get size (in bytes) of sent message
+    int total = 0;
+    while (total < len)
+    {
+
+        int n = recv(fd, buf + total, len - total, 0);
+        if (n <= 0)
+            return false; // error handling
+        total += n;
+    }
+
+    return true;
+}
+
+// this function sends the entire message to a connected socket (fd),
+// while handling socket blocking and partial sends
+bool is_send_all(int fd, const char *buf, int len)
+{
+    int total = 0;
+    while (total < len)
+    {
+
+        int n = send(fd, buf + total, len - total, MSG_NOSIGNAL);
+        if (n <= 0)
+            return false; // error handling
+
+        total += n;
+    }
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -64,69 +99,41 @@ int main(int argc, char *argv[])
         while (true)
         {
             // read size of received message
+            // get size (in bytes) of sent message
             uint32_t len;
-            int bytes = 0;
-            while (bytes < sizeof(len))
-            {
-                int n = recv(client_fd, (char *)&len + bytes, sizeof(len) - bytes, 0);
-                if (n <= 0)
-                    break;
-                bytes += n;
-            }
-
-            if (bytes < sizeof(len))
-                break; // did not read full message size
+            // get the length; break out if error
+            if (!is_recv_all(client_fd, (char *)&len, sizeof(len)))
+                break;
 
             uint32_t msg_siz = ntohl(len); // convert from network to host byte order
                                            // len: network byte order
                                            // msg_size: host byte order
 
             // get message sent from client
-            bytes = 0;
-            while (bytes < msg_siz)
+            size_t total = msg_siz;
+            while (total > 0)
             {
-                int n = recv(client_fd, buffer + bytes, msg_siz - bytes, 0);
-                if (n <= 0)
+                size_t chunk = std::min(total, sizeof(buffer));
+                if (!is_recv_all(client_fd, buffer, chunk))
                     break;
 
-                bytes += n;
+                std::cout << "Recieved:\n\n";
+                std::cout.write(buffer, chunk);
+                std::cout << "\n\n";
+
+                total -= chunk;
             }
-
-            if (bytes < msg_siz)
-                break; // did not read full message
-
-            std::cout << "Recieved: " << bytes << " bytes\n\n";
-            std::cout.write(buffer, bytes);
-            std::cout << "\n\n";
 
             const std::string response = "Hello from server " + std::to_string(port) + "\n";
             uint32_t response_len = htonl(response.size()); // convert size from host byte order to network byte order
 
             // send message size to client
-            bytes = 0;
-            while (bytes < sizeof(response_len))
-            {
-                int n = send(client_fd, (char *)&response_len + bytes, sizeof(response_len) - bytes, MSG_NOSIGNAL);
-                if (n <= 0)
-                    break;
-                bytes += n;
-            }
+            if (!is_send_all(client_fd, (char *)&response_len, sizeof(response_len)))
+                break;
 
-            if (bytes < sizeof(response_len))
-                break; // failed to send message size
-
-            // send server response to client
-            int total = 0;
-            while (total < response.size())
-            {
-                int n = send(client_fd, response.c_str() + total, response.size() - total, MSG_NOSIGNAL);
-                if (n <= 0)
-                    break;
-                total += n;
-            }
-
-            if (total < response.size())
-                break; // failed to send entire message
+            // send message to client
+            if (!is_send_all(client_fd, response.c_str(), response.size()))
+                break;
         }
         close(client_fd); // close client
     }

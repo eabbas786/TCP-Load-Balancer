@@ -27,10 +27,77 @@ int main()
 
     // Testing sending a message larger than buffer
     std::string msg(5 * 1024 * 1024, 'A'); // 1MB
-    // std::cout << "Client sending: " + msg + "\n";
-    // std::string msg(4096, 'A');
-    send(socket_fd, msg.c_str(), msg.size(), 0);
+    uint32_t len = htonl(msg.size());      // convert size from host byte order to network byte order
+    int bytes = 0;
+    while (bytes < sizeof(len))
+    {
+        int n = send(socket_fd, (char *)&len + bytes, sizeof(len) - bytes, MSG_NOSIGNAL);
+        if (n <= 0)
+            break;
+        bytes += n;
+    }
+
+    if (bytes < sizeof(len))
+    {
+        std::perror("Failed to send length of message.");
+        return EXIT_FAILURE; // failed to send message len; end connection
+    }
+
+    bytes = 0;
+    // loop using msg.size() since host byte order; not len
+    while (bytes < msg.size())
+    {
+        int n = send(socket_fd, msg.c_str() + bytes, msg.size() - bytes, MSG_NOSIGNAL);
+        if (n <= 0)
+            break;
+        bytes += n;
+    }
+
+    if (bytes < msg.size())
+    {
+        std::perror("Failed to send entire message.");
+        return EXIT_FAILURE; // failed to send entire message
+    }
+
     char buffer[4096];
-    recv(socket_fd, buffer, sizeof(buffer), 0);
-    std::cout << "Client recieved: " << buffer << "\n";
+
+    // get size (in bytes) of received message
+    uint32_t response_len; // will store in network byte order
+    bytes = 0;
+    while (bytes < sizeof(response_len))
+    {
+        int n = recv(socket_fd, (char *)&response_len + bytes, sizeof(response_len) - bytes, 0);
+        if (n <= 0)
+            break;
+        bytes += n;
+    }
+
+    if (bytes < sizeof(response_len))
+    {
+        std::perror("Failed to read message len from server.");
+        return EXIT_FAILURE; // did not recieve right message length
+    }
+
+    uint32_t msg_siz = ntohl(response_len); // convert into host byte order
+
+    // get meesage sent from client
+    bytes = 0;
+    while (bytes < msg_siz)
+    {
+        int n = recv(socket_fd, buffer + bytes, msg_siz - bytes, 0);
+        if (n <= 0)
+            break;
+
+        bytes += n;
+    }
+
+    if (bytes < msg_siz)
+    {
+        std::perror("Failed to read entire message from server.");
+        return EXIT_FAILURE;
+    }
+
+    std::cout << "Recieved: \n";
+    std::cout.write(buffer, bytes);
+    std::cout << "\nfrom backend\n";
 }
