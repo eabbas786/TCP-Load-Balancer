@@ -3,6 +3,6 @@ A networking load balancer written in C++ that functions as a TCP proxy. It impl
 
 The system uses POSIX sockets to accept client connections and dispatch them to a worker thread pool created at startup. Each worker thread handles an individual client connection by establishing a backend connection and spawning two threads per connection to manage bidirectional forwarding between client and backend, enabling concurrent full-duplex communication.
 
-The system was validated under concurrent multi-client stress testing with simulated slow clients and high-throughput message bursts to evaluate stability and correctness under load. Proper handling of partial reads/writes and controlled connection shutdown ensures reliable forwarding without deadlocks or data loss.
+To ensure correctness over TCP’s stream-oriented model, a length-prefixed protocol is used to preserve message boundaries. Messages are forwarded using chunked streaming, where large payloads are transmitted in fixed-size buffers while maintaining a single logical message frame, allowing efficient handling of arbitrarily large messages without excessive memory usage.
 
-A length-prefixed protocol is used to frame messages over TCP, ensuring correct reconstruction of message boundaries despite TCP’s stream-oriented nature.
+The system was validated through concurrent multi-client stress testing, including slow clients and large payload (multi-megabyte) transfers, ensuring reliable handling of partial reads/writes and proper connection shutdown without deadlocks or data loss.
