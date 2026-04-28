@@ -56,13 +56,13 @@ void worker()
         Backend *backend = task.backend;
         std::cout << "WORKER: " << task.backend << std::endl;
         // backend->num_connections++; // Important: increment atomic counter
-        std::cout << "Port " << backend->port << " has " << backend->num_connections
+        std::cout << "Port " << backend->port << " has " << backend->num_connections.load()
                   << " connections before handle client\n";
         handle_client(task.client_fd, backend); // forward client to backend
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
         close(task.client_fd);      // close client socket
         backend->num_connections--; // connection closed; decrement atomic counter
-        std::cout << "Port " << backend->port << " has " << backend->num_connections
+        std::cout << "Port " << backend->port << " has " << backend->num_connections.load()
                   << " connections after being decremented\n";
     }
 }

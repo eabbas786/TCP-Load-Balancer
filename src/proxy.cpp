@@ -1,11 +1,120 @@
 
 #include "proxy.h"
 
+#include <atomic>
 #include <thread>
+#include <sys/select.h> // for select: prevent blocking
+#include <unistd.h>
+#include <arpa/inet.h>
 #include <iostream>
 #include <cstdio> //perror
-#include <arpa/inet.h>
-#include <unistd.h>
+
+std::atomic_bool running = true; // for handling connection if one side closes
+
+// this function uses select to check if the socket is ready for reading
+int get_readable_state(int fd)
+{
+    fd_set set;
+    FD_ZERO(&set);
+    FD_SET(fd, &set);
+    timeval tv{};
+    tv.tv_sec = 0;
+    tv.tv_usec = 100000; // 100ms
+
+    // check if connection is still running
+    if (!running.load())
+        return false;
+
+    int num = select(fd + 1, &set, nullptr, nullptr, &tv); // check if available to be read from
+
+    // timeout, need to retry
+    // if (num <= 0)
+    //     return true;
+
+    // return FD_ISSET(fd, &set); // return if fd available to be read
+    return num;
+}
+
+// this function uses select to check if the socket is a ready for writing
+int get_writable_state(int fd)
+{
+    fd_set set;
+    FD_ZERO(&set);
+    FD_SET(fd, &set);
+
+    timeval tv{};
+    tv.tv_sec = 0;
+    tv.tv_usec = 100000; // 100ms
+
+    // check if connection is still running
+    if (!running.load())
+        return false;
+
+    int num = select(fd + 1, nullptr, &set, nullptr, &tv); // check if available to be written
+
+    // timeout, need to retry
+    // if (num < 0)
+    //     return false;
+
+    // return FD_ISSET(fd, &set); // return if fd available to be read
+    return num;
+}
+
+// this function receives the entire message from a connected socket (fd),
+// while handling socket blocking and partial reads
+int recv_all(int fd, char *buf, int len)
+{
+    // get size (in bytes) of sent message
+    int total = 0;
+    while (total < len)
+    {
+        // int num = get_readable_state(fd);
+        // if (num < 0)
+        //     return -1; // socket is not ready
+
+        // if (num == 0)
+        //     return 0;
+
+        int n = recv(fd, buf + total, len - total, 0);
+        if (n <= 0)
+            return -1; // error handling
+        total += n;
+    }
+
+    return 1;
+}
+
+// this function sends the entire message to a connected socket (fd),
+// while handling socket blocking and partial sends
+int send_all(int fd, const char *buf, int len)
+{
+    int total = 0;
+    while (total < len)
+    {
+        // int num = get_writable_state(fd);
+
+        // if (num < 0)
+        //     return -1;
+        // if (num == 0)
+        //     return 0;
+
+        int n = send(fd, buf + total, len - total, MSG_NOSIGNAL);
+        if (n <= 0)
+            return -1; // error handling
+
+        total += n;
+    }
+    return 1;
+}
+
+// this function shuts down the connections and updates the atomic variable
+// to inform other threads of execution that the connection has been closed
+void end_connection(int s1, int s2)
+{
+    running = false;
+    shutdown(s1, SHUT_RDWR);
+    shutdown(s2, SHUT_RDWR);
+}
 
 // helper function to handle sending/ recieving data
 void handle_data(int src, int dest)
@@ -13,22 +122,113 @@ void handle_data(int src, int dest)
     char buffer[4096];
     while (true)
     {
-        int bytes = recv(src, buffer, sizeof(buffer), 0);
-        if (bytes <= 0)
+        // get size (in bytes) of sent message
+        uint32_t len;
+        // get the length; break out if error
+        int status = recv_all(src, (char *)&len, sizeof(len));
+        if (status < 0)
+        {
+            end_connection(src, dest);
             break;
+        }
+        if (status == 0)
+            continue;
 
-        std::cout << "Recieved: " << bytes << " bytes\n\n";
-        std::cout.write(buffer, bytes);
+        uint32_t msg_siz = ntohl(len); // len is in network byte order and msg_size host byte
+
+        // get entire message; break if error
+        status = recv_all(src, buffer, msg_siz);
+        if (status < 0)
+        {
+            end_connection(src, dest);
+            break;
+        }
+        if (status == 0)
+            continue;
+
+        std::cout << "Recieved: " << msg_siz << " bytes\n\n";
+        std::cout.write(buffer, msg_siz);
         std::cout << "\n\n";
 
-        int total = 0;
-        while (total < bytes)
+        // send message length to dest; break if fail
+        status = send_all(dest, (char *)&len, sizeof(len));
+        if (status < 0)
         {
-            int n = send(dest, buffer + total, bytes - total, MSG_NOSIGNAL);
-            if (n <= 0)
-                break;
-            total += n;
+            end_connection(src, dest);
+            break;
         }
+        if (status == 0)
+            continue;
+
+        // send message to dest
+        status = send_all(dest, buffer, msg_siz);
+        if (status < 0)
+        {
+            end_connection(src, dest);
+            break;
+        }
+        if (status == 0)
+            continue;
+
+        // int bytes = 0;
+        // while (bytes < sizeof(len))
+        // {
+        //     int n = recv(src, (char *)&len + bytes, sizeof(len) - bytes, 0);
+        //     if (n <= 0)
+        //         break;
+        //     bytes += n;
+        // }
+
+        // // failed to read size correctly break out of loop
+        // if (bytes < sizeof(len))
+        //     break;
+
+        // // get meesage sent from client
+        // bytes = 0;
+        // while (bytes < msg_siz)
+        // {
+        //     int n = recv(src, buffer + bytes, msg_siz - bytes, 0);
+        //     if (n <= 0)
+        //         break;
+
+        //     bytes += n;
+        // }
+
+        // // failed to read full message break out of loop
+        // if (bytes < msg_siz)
+        //     break;
+
+        // std::cout << "Recieved: " << bytes << " bytes\n\n";
+        // std::cout.write(buffer, bytes);
+        // std::cout << "\n\n";
+
+        // // send size of message to server in network byte order (len)
+        // bytes = 0;
+        // while (bytes < sizeof(len))
+        // {
+        //     int n = send(dest, (char *)&len + bytes, sizeof(len) - bytes, MSG_NOSIGNAL);
+        //     if (n <= 0)
+        //         break;
+        //     bytes += n;
+        // }
+
+        // // failed to send message size
+        // if (bytes < sizeof(len))
+        //     break;
+
+        // // send message to server; use msg_siz since in host byte order
+        // int total = 0;
+        // while (total < msg_siz)
+        // {
+        //     int n = send(dest, buffer + total, msg_siz - total, MSG_NOSIGNAL);
+        //     if (n <= 0)
+        //         break;
+        //     total += n;
+        // }
+
+        // // failed to send entire message
+        // if (total < msg_siz)
+        //     break;
     }
 }
 void handle_client(int client_fd, Backend *backend)

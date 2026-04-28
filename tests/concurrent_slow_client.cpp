@@ -26,6 +26,7 @@ void client_worker(int id)
         std::perror("connection failed");
         return;
     }
+
     for (int i = 0; i < 50; i++)
     {
         std::string msg = "client " + std::to_string(id) + " msg " + std::to_string(i) + "\n";
@@ -94,6 +95,8 @@ void client_worker(int id)
         std::cout << "Recieved: \n";
         std::cout.write(buffer, bytes);
         std::cout << "\nfrom backend\n";
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // add delay in between sends
     }
 
     close(socket_fd);
@@ -101,7 +104,7 @@ void client_worker(int id)
 
 int main()
 {
-    const int NUM_CLIENTS = 10;
+    const int NUM_CLIENTS = 100;
 
     std::vector<std::thread> threads;
 

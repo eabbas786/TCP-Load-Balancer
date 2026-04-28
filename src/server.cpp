@@ -59,26 +59,76 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        char buffer[4096];
+        char buffer[4096]; // for storing data
 
         while (true)
         {
-            // read message from client and write into buffer using recv
-            int bytes = recv(client_fd, buffer, sizeof(buffer), 0);
-            if (bytes <= 0)
-                break;
+            // read size of received message
+            uint32_t len;
+            int bytes = 0;
+            while (bytes < sizeof(len))
+            {
+                int n = recv(client_fd, (char *)&len + bytes, sizeof(len) - bytes, 0);
+                if (n <= 0)
+                    break;
+                bytes += n;
+            }
 
-            std::cout << "Recieved: \n";
+            if (bytes < sizeof(len))
+                break; // did not read full message size
+
+            uint32_t msg_siz = ntohl(len); // convert from network to host byte order
+                                           // len: network byte order
+                                           // msg_size: host byte order
+
+            // get message sent from client
+            bytes = 0;
+            while (bytes < msg_siz)
+            {
+                int n = recv(client_fd, buffer + bytes, msg_siz - bytes, 0);
+                if (n <= 0)
+                    break;
+
+                bytes += n;
+            }
+
+            if (bytes < msg_siz)
+                break; // did not read full message
+
+            std::cout << "Recieved: " << bytes << " bytes\n\n";
             std::cout.write(buffer, bytes);
+            std::cout << "\n\n";
 
             const std::string response = "Hello from server " + std::to_string(port) + "\n";
+            uint32_t response_len = htonl(response.size()); // convert size from host byte order to network byte order
+
+            // send message size to client
+            bytes = 0;
+            while (bytes < sizeof(response_len))
+            {
+                int n = send(client_fd, (char *)&response_len + bytes, sizeof(response_len) - bytes, MSG_NOSIGNAL);
+                if (n <= 0)
+                    break;
+                bytes += n;
+            }
+
+            if (bytes < sizeof(response_len))
+                break; // failed to send message size
 
             // send server response to client
-            send(client_fd, response.c_str(), response.length(), 0);
+            int total = 0;
+            while (total < response.size())
+            {
+                int n = send(client_fd, response.c_str() + total, response.size() - total, MSG_NOSIGNAL);
+                if (n <= 0)
+                    break;
+                total += n;
+            }
+
+            if (total < response.size())
+                break; // failed to send entire message
         }
-
-        close(client_fd);
+        close(client_fd); // close client
     }
-
     close(server_fd); // close program's listener
 }
