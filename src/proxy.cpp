@@ -12,55 +12,6 @@
 
 std::atomic_bool running = true; // for handling connection if one side closes
 
-// this function uses select to check if the socket is ready for reading
-int get_readable_state(int fd)
-{
-    fd_set set;
-    FD_ZERO(&set);
-    FD_SET(fd, &set);
-    timeval tv{};
-    tv.tv_sec = 0;
-    tv.tv_usec = 100000; // 100ms
-
-    // check if connection is still running
-    if (!running.load())
-        return false;
-
-    int num = select(fd + 1, &set, nullptr, nullptr, &tv); // check if available to be read from
-
-    // timeout, need to retry
-    // if (num <= 0)
-    //     return true;
-
-    // return FD_ISSET(fd, &set); // return if fd available to be read
-    return num;
-}
-
-// this function uses select to check if the socket is a ready for writing
-int get_writable_state(int fd)
-{
-    fd_set set;
-    FD_ZERO(&set);
-    FD_SET(fd, &set);
-
-    timeval tv{};
-    tv.tv_sec = 0;
-    tv.tv_usec = 100000; // 100ms
-
-    // check if connection is still running
-    if (!running.load())
-        return false;
-
-    int num = select(fd + 1, nullptr, &set, nullptr, &tv); // check if available to be written
-
-    // timeout, need to retry
-    // if (num < 0)
-    //     return false;
-
-    // return FD_ISSET(fd, &set); // return if fd available to be read
-    return num;
-}
-
 // this function receives the entire message from a connected socket (fd),
 // while handling socket blocking and partial reads
 int recv_all(int fd, char *buf, int len)
@@ -69,12 +20,6 @@ int recv_all(int fd, char *buf, int len)
     int total = 0;
     while (total < len)
     {
-        // int num = get_readable_state(fd);
-        // if (num < 0)
-        //     return -1; // socket is not ready
-
-        // if (num == 0)
-        //     return 0;
 
         int n = recv(fd, buf + total, len - total, 0);
         if (n <= 0)
@@ -92,13 +37,6 @@ int send_all(int fd, const char *buf, int len)
     int total = 0;
     while (total < len)
     {
-        // int num = get_writable_state(fd);
-
-        // if (num < 0)
-        //     return -1;
-        // if (num == 0)
-        //     return 0;
-
         int n = send(fd, buf + total, len - total, MSG_NOSIGNAL);
         if (n <= 0)
             return -1; // error handling
@@ -213,64 +151,3 @@ void handle_client(int client_fd, Backend *backend)
 
     close(upstream_fd); // close socket
 }
-
-// char buffer[4096]; // buffer to read and store sent data
-
-// while (true)
-// {
-
-// read bytes sent by client to proxy into buffer
-// std::cout << "4) About to recieve from client " << client_fd << "\n";
-
-// std::cout << "4) C"
-
-// std::cout << "5) Recieve from client return " << bytes << " bytes \n";
-// std::cout << "Recieved: ";
-// std::cout.write(buffer, bytes);
-// std::cout << "\nfrom Client\n ";
-
-// send the collected data from proxy to backend server
-// std::cout
-//     << "6) Forwarding to backend: "
-//     << backend->host
-//     << ":"
-//     << backend->port
-//     << std::endl;
-
-// int sent = 0;
-// while (sent < bytes)
-// {
-//     int n = send(upstream_fd, buffer + sent, bytes - sent, 0);
-//     if (n <= 0)
-//         break;
-//     sent += n;
-// }
-
-// // read data sent from backend server to proxy
-// std::cout << "7) About to recieve from Backend\n";
-// bytes = recv(upstream_fd, buffer, sizeof(buffer), 0);
-// if (bytes <= 0)
-//     break;
-
-// std::cout << "8) Recieved: " << bytes << " bytes\n";
-// std::cout.write(buffer, bytes);
-// std::cout << "\nfrom Backend\n ";
-// // send data sent by server to client
-
-// std::cout
-//     << "9) Sending to client\n";
-// sent = 0;
-// while (sent < bytes)
-// {
-//     int n = send(client_fd, buffer + sent, bytes - sent, 0);
-//     if (n <= 0)
-//         break;
-//     sent += n;
-// }
-
-//     std::cout << "10) Done\n";
-// }
-
-// close sockets
-// close(upstream_fd);
-//}
