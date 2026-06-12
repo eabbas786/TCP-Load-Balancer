@@ -6,6 +6,11 @@ BUILD_DIR := ./build
 SRC_DIR := ./src
 TEST_DIR := ./test
 
+# get dependencies
+SRCS := $(shell find $(SRC_DIR) -name '*.cpp')
+OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
+DEPS := $(OBJS:.o=.d)
+
 # object file for server
 SER_OBJECTS := $(BUILD_DIR)/src/server.cpp.o
 
@@ -20,7 +25,7 @@ LB_OBJS := $(LB_SRCS:%=$(BUILD_DIR)/%.o)
 
 
 # Every folder in ./src will need to be passed to GCC so that it can find header files
-INC_DIRS := $(shell find $(SRC_DIRS) -type d)
+INC_DIRS := $(shell find $(SRC_DIR) -type d)
 # Add a prefix to INC_DIRS. So moduleA would become -ImoduleA. GCC understands this -I flag
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
