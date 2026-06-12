@@ -24,6 +24,7 @@ LB_SRCS = \
 LB_OBJS := $(LB_SRCS:%=$(BUILD_DIR)/%.o)
 
 
+
 # Every folder in ./src will need to be passed to GCC so that it can find header files
 INC_DIRS := $(shell find $(SRC_DIR) -type d)
 # Add a prefix to INC_DIRS. So moduleA would become -ImoduleA. GCC understands this -I flag
@@ -48,16 +49,16 @@ $(BUILD_DIR)/server: $(SER_OBJECTS)
 	$(CXX) $^ -o $@
 
 # build each stress test
-$(BUILD_DIR)/stress_client: tests/stress_client.cpp
+$(BUILD_DIR)/stress_client: $(BUILD_DIR)/tests/stress_client.cpp.o
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-$(BUILD_DIR)/slow_client: tests/slow_client.cpp
+$(BUILD_DIR)/slow_client: $(BUILD_DIR)/tests/slow_client.cpp.o
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-$(BUILD_DIR)/concurrent_slow_client: tests/concurrent_slow_client.cpp
+$(BUILD_DIR)/concurrent_slow_client: $(BUILD_DIR)/tests/concurrent_slow_client.cpp.o
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-$(BUILD_DIR)/large_message: tests/large_message.cpp
+$(BUILD_DIR)/large_message: $(BUILD_DIR)/tests/large_message.cpp.o
 	$(CXX) $(CXXFLAGS) $< -o $@
 
 # build step for C++ source
