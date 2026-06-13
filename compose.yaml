@@ -1,0 +1,22 @@
+services:
+  load_balancer:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - server1
+      - server2
+      - server3
+    command: ["./load_balancer", "8080"]
+
+  server1:
+    build: .
+    command: ["./server", "9000"]
+
+  server2:
+    build: .
+    command: ["./server", "9000"]
+
+  server3:
+    build: .
+    command: ["./server", "9000"]

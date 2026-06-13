@@ -25,9 +25,13 @@ int main(int argc, char *argv[])
     // vector reallocation. Backend contains a member
     // of atomic type so cannot be copied
     std::vector<std::unique_ptr<Backend>> backends;
-    backends.push_back(std::make_unique<Backend>("127", 9001));
-    backends.push_back(std::make_unique<Backend>("127", 9002));
-    backends.push_back(std::make_unique<Backend>("127", 9003));
+    backends.push_back(std::make_unique<Backend>("server1", 9000));
+    backends.push_back(std::make_unique<Backend>("server2", 9000));
+    backends.push_back(std::make_unique<Backend>("server3", 9000));
+
+    // backends.push_back(std::make_unique<Backend>("127", 9001));
+    // backends.push_back(std::make_unique<Backend>("127", 9002));
+    // backends.push_back(std::make_unique<Backend>("127", 9003));
 
     // create thread pool
     start_thread_pool();

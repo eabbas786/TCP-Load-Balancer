@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <atomic>
 struct Backend
 {
     std::string host;
